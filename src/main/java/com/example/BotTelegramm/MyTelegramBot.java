@@ -26,3 +26,4 @@ public class MyTelegramBot implements SpringLongPollingBot {
         return updateConsumer;
     }
 }
+
