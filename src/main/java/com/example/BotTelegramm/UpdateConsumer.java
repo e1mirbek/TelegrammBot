@@ -4,15 +4,22 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient;
 import org.telegram.telegrambots.longpolling.util.LongPollingSingleThreadUpdateConsumer;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
+import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -33,6 +40,14 @@ public class UpdateConsumer implements LongPollingSingleThreadUpdateConsumer {
            Long chatId = update.getMessage().getChatId();
            if (messageText.equals("/start")) {
                sendMainMenu(chatId);
+           } else if (messageText.equals("/keyboard")) {
+               sendReplyKeyboard(chatId);
+           } else if (messageText.equals("Привет")) {
+               sendMyName(chatId, update.getMessage().getFrom());
+           } else if (messageText.equals("Случайное число")) {
+               sendRandomNumber(chatId);
+           } else if (messageText.equals("Картинка")) {
+               sendImage(chatId);
            } else {
              sendMessage(chatId, "Я вас не понимаю !!! ");
            }
@@ -41,9 +56,27 @@ public class UpdateConsumer implements LongPollingSingleThreadUpdateConsumer {
        }
     }
 
+    private void sendReplyKeyboard(Long chatId)  {
+        SendMessage sendMessage = SendMessage.builder()
+                .chatId(chatId.toString())
+                .text("Это пример обычный клавиатуры: ")
+                .build();
+
+        List<KeyboardRow> keyboardRows = List.of(
+                new KeyboardRow("Привет", "Случайное число", "Картинка")
+        );
+        ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup(keyboardRows);
+        sendMessage.setReplyMarkup(replyKeyboardMarkup);
+
+        try {
+            telegramClient.execute(sendMessage);
+        } catch (TelegramApiException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
 
-   // Логика определения, на какую кнопку нажал пользователь
+    // Логика определения, на какую кнопку нажал пользователь
     private void handleCallbackQuery(CallbackQuery callbackQuery) {
         var data = callbackQuery.getData();
         var chatId = callbackQuery.getFrom().getId();
@@ -66,8 +99,26 @@ public class UpdateConsumer implements LongPollingSingleThreadUpdateConsumer {
     }
 
     private void sendImage(Long chatId) {
-
         sendMessage(chatId, "Запустили запрос картинки");
+        new Thread(() -> {
+            var imageUrl = "https://picsum.photos/200";
+            try {
+                URL url = new URL(imageUrl);
+                var inputStream = url.openStream();
+                SendPhoto sendPhoto = SendPhoto.builder()
+                        .chatId(chatId).
+                        photo(new InputFile(inputStream, "random_image.jpg"))
+                        .caption("Ваша случайная картинка: ")
+                        .build();
+                telegramClient.execute(sendPhoto);
+            } catch (MalformedURLException e) {
+                throw new RuntimeException(e);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            } catch (TelegramApiException e) {
+                throw new RuntimeException(e);
+            }
+        }).start();
     }
 
     private void sendRandomNumber(Long chatId) {
